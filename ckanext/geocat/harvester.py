@@ -185,6 +185,19 @@ class GeocatHarvester(HarvesterBase):
                 pkg_dict['id'] = existing['id']
                 updated_pkg = get_action('package_update')(package_context, pkg_dict)
                 log.debug("Updated PKG: %s" % updated_pkg)
+
+                # Flag the other objects linking to this package as not current anymore
+                from ckanext.harvest.model import harvest_object_table
+                conn = Session.connection()
+                u = update(harvest_object_table) \
+                        .where(harvest_object_table.c.package_id==bindparam('b_package_id')) \
+                        .values(current=False)
+                conn.execute(u, b_package_id=pkg_dict['id'])
+
+                # Flag this as the current harvest object
+                harvest_object.package_id = pkg_dict['id']
+                harvest_object.current = True
+                harvest_object.save()
             except NotFound:
                 log.debug("No package found, create a new one!")
 
